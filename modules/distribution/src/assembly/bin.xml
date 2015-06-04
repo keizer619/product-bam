@@ -219,6 +219,18 @@
         </fileSet>
 
 
+        <!--creating an empty domain template directory-->
+        <fileSet>
+            <directory>.</directory>
+            <outputDirectory>
+                ${pom.artifactId}-${pom.version}/repository/conf/cep/domain-template
+            </outputDirectory>
+            <excludes>
+                <exclude>**/*</exclude>
+            </excludes>
+        </fileSet>
+
+
         <!-- END CEP -->
 
         <!-- Start UES related artifacts -->
@@ -483,6 +495,8 @@
 
         <!-- END - default input/output adaptor configurations -->
 
+
+
         <!-- Analytics datasources -->
         <file>
             <source>
@@ -571,6 +585,15 @@
             </source>
             <outputDirectory>${pom.artifactId}-${pom.version}/repository/conf/cep
             </outputDirectory>
+            <filtered>true</filtered>
+        </file>
+
+        <!--Copying sample domain template file -->
+        <file>
+            <source>
+                src/repository/conf/domain-template/temperature-analysis.xml
+            </source>
+            <outputDirectory>${pom.artifactId}-${pom.version}/repository/conf/cep/domain-template</outputDirectory>
             <filtered>true</filtered>
         </file>
 
