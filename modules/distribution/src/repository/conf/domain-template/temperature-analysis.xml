@@ -18,7 +18,7 @@
 <templateDomain name="TemperatureAnalysis">
     <description>Temperature Analysis Description</description>
     <templates>
-        <template name="Template1">
+        <template name="TemperatureAnalysis1">
             <description>Trigger alert by specifying minimum maximum temperature values and maximum total duration
                 value
             </description>
@@ -44,18 +44,24 @@
                     define stream alertStream2 (smartDeviceId int, gatewayId int, totalDuration long, averageTemperature double);
 
                     @info(name = 'query')
-                    from deviceDoorStream#window.timeBatch(20 sec) join deviceHealthStream#window.timeBatch(20 sec)
+                    from deviceDoorStream#window.timeBatch($timeBatchWindow) join deviceHealthStream#window.timeBatch($timeBatchWindow)
                     on deviceDoorStream.smartDeviceId == deviceHealthStream.smartDeviceId
                     select deviceHealthStream.smartDeviceId  as smartDeviceId,
                     deviceDoorStream.gatewayId,
                     sum(deviceDoorStream.doorOpenDuration) as totalDuration,
                     avg(deviceHealthStream.temperature) as averageTemperature
                     group by deviceHealthStream.smartDeviceId
-                    having totalDuration < $maxDuration and ( averageTemperature < $maxTemperature and averageTemperature > $minTemperature)
+                    having totalDuration < $maxDuration and ( averageTemperature > $maxTemperature or averageTemperature < $minTemperature)
                     insert into alertStream;
                  ]]>
             </executionPlan>
             <parameters>
+                <parameter name="$timeBatchWindow" type="time">
+                    <displayName>Time batch window size</displayName>
+                    <description>Value type should be time eg:-60 min</description>
+                    <defaultValue>30 min</defaultValue>
+                </parameter>
+
                 <parameter name="$maxDuration" type="int">
                     <displayName>Maximum duration</displayName>
                     <description>Maximum duration of between time windows</description>
@@ -76,7 +82,7 @@
             </parameters>
         </template>
 
-        <template name="Template2">
+        <template name="TemperatureAnalysis2">
             <description>Trigger alert by specifying minimum maximum temperature and total duration values</description>
             <executionPlan>
                 <![CDATA[
@@ -100,18 +106,24 @@
                     define stream alertStream2 (smartDeviceId int, gatewayId int, totalDuration long, averageTemperature double);
 
                     @info(name = 'query')
-                    from deviceDoorStream#window.timeBatch(20 sec) join deviceHealthStream#window.timeBatch(20 sec)
+                    from deviceDoorStream#window.timeBatch($timeBatchWindow) join deviceHealthStream#window.timeBatch($timeBatchWindow)
                     on deviceDoorStream.smartDeviceId == deviceHealthStream.smartDeviceId
                     select deviceHealthStream.smartDeviceId  as smartDeviceId,
                     deviceDoorStream.gatewayId,
                     sum(deviceDoorStream.doorOpenDuration) as totalDuration,
                     avg(deviceHealthStream.temperature) as averageTemperature
                     group by deviceHealthStream.smartDeviceId
-                    having (totalDuration < $maxDuration and totalDuration > $minDuration ) and ( averageTemperature < $maxTemperature and averageTemperature > $minTemperature)
+                    having (totalDuration < $maxDuration and totalDuration > $minDuration ) and ( averageTemperature > $maxTemperature and averageTemperature < $minTemperature)
                     insert into alertStream;
                  ]]>
             </executionPlan>
             <parameters>
+                <parameter name="$timeBatchWindow" type="time">
+                    <displayName>Time batch window size</displayName>
+                    <description>Value type should be time eg:-60 min</description>
+                    <defaultValue>30 min</defaultValue>
+                </parameter>
+
                 <parameter name="$maxDuration" type="int">
                     <displayName>Maximum duration</displayName>
                     <description>Maximum duration of between time windows</description>
@@ -139,8 +151,8 @@
         </template>
 
 
-        <template name="Template3">
-            <description>Trigger alert by specifying only minimum value</description>
+        <template name="TemperatureAnalysis3">
+            <description>Trigger alert by specifying only maximum value</description>
             <executionPlan>
                 <![CDATA[
                /* Enter a unique ExecutionPlan */
@@ -163,27 +175,32 @@
                     define stream alertStream2 (smartDeviceId int, gatewayId int, totalDuration long, averageTemperature double);
 
                     @info(name = 'query')
-                    from deviceDoorStream#window.timeBatch(20 sec) join deviceHealthStream#window.timeBatch(20 sec)
+                    from deviceDoorStream#window.timeBatch($timeBatchWindow) join deviceHealthStream#window.timeBatch($timeBatchWindow)
                     on deviceDoorStream.smartDeviceId == deviceHealthStream.smartDeviceId
                     select deviceHealthStream.smartDeviceId  as smartDeviceId,
                     deviceDoorStream.gatewayId,
                     sum(deviceDoorStream.doorOpenDuration) as totalDuration,
                     avg(deviceHealthStream.temperature) as averageTemperature
                     group by deviceHealthStream.smartDeviceId
-                    having  $minTemperature > $minTemperature
+                    having  $maxTemperature < totalDuration
                     insert into alertStream;
                  ]]>
             </executionPlan>
             <parameters>
-                <parameter name="$minTemperature" type="int">
-                    <displayName>Minimum temperature</displayName>
-                    <description>Minimum temperature average temperature should be</description>
+                <parameter name="$timeBatchWindow" type="time">
+                    <displayName>Time batch window size</displayName>
+                    <description>Value type should be time eg:-60 min</description>
+                    <defaultValue>60 min</defaultValue>
+                </parameter>
+                <parameter name="$maxTemperature" type="int">
+                    <displayName>Maximum temperature</displayName>
+                    <description>Maximum temperature average temperature should be</description>
                     <defaultValue>15</defaultValue>
                 </parameter>
             </parameters>
         </template>
 
-        <template name="Template3">
+        <template name="DoorOpenTimeAnalysis">
             <description>Trigger alert by specifying only minimum value</description>
             <executionPlan>
                 <![CDATA[
@@ -212,7 +229,7 @@
                     sum(deviceDoorStream.doorOpenDuration) as totalDuration,
                     avg(deviceHealthStream.temperature) as averageTemperature
                     group by deviceHealthStream.smartDeviceId
-                    having totalDuration < $maxDuration and
+                    having totalDuration > $maxDuration and
                     (time:timestampInMilliseconds(time:currentTime(),'HH:mm:ss') >
                                       time:timestampInMilliseconds('$startTime','HH:mm:ss')
                                      and time:timestampInMilliseconds(time:currentTime(),'HH:mm:ss') <
@@ -223,7 +240,7 @@
             <parameters>
                 <parameter name="$timeBatchWindow" type="time">
                     <displayName>Time batch window size</displayName>
-                    <description>Maximum door open duration (time value eg:-60 min)</description>
+                    <description>Value type should be time eg:-60 min</description>
                     <defaultValue>60 min</defaultValue>
                 </parameter>
                 <parameter name="$maxDuration" type="int">
