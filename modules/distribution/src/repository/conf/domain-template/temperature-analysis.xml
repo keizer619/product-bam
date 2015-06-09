@@ -19,160 +19,372 @@
     <description>Temperature Analysis Description</description>
     <templates>
         <template name="Template1">
-            <description>Monitoring alerting based on room temperature</description>
+            <description>Trigger alert by specifying minimum maximum temperature values and maximum total duration
+                value
+            </description>
             <executionPlan>
                 <![CDATA[
-                /* Enter a unique ExecutionPlan */
-                @Plan:name('testPlan')
+               /* Enter a unique ExecutionPlan */
+                    @Plan:name('TemperatureAnalysis')
 
-                /* Enter a unique description for ExecutionPlan */
-                -- @Plan:description('ExecutionPlan')
+                    /* Enter a unique description for ExecutionPlan */
+                    -- @Plan:description('ExecutionPlan')
 
-                /* define streams and write query here ... */
+                    /* define streams/tables and write queries here ... */
 
-                @Import('inStream:1.0.0')
-                define stream inStream (temperature double, roomNumber int);
 
-                @Export('outStream:1.0.0')
-                define stream outStream (temperature double, roomNumber int);
 
-                from inStream[temperature > $maxVal]
-                select temperature,roomNumber 
-                insert into outStream;
+                    @Import('deviceHealthStream:1.0.0')
+                    define stream deviceHealthStream (smartDeviceHealthRecordId int, smartDeviceId int, gatewayId int, eventId int, eventTime string, eventTypeId int, lightIntensity int, temperature float, humidity float, soundLevel float, isDoorOpen bool, powerStatusId int, batteryLevel float, createdOn string);
+
+                    @Import('deviceDoorStream:1.0.0')
+                    define stream deviceDoorStream (smartDeviceDoorStatusId int, smartDeviceId int, gatewayId int, eventTime string, EventId int, doorOpen string, createdOn string, doorOpenDuration int);
+
+                    @Export('alertStream:1.0.0')
+                    define stream alertStream2 (smartDeviceId int, gatewayId int, totalDuration long, averageTemperature double);
+
+                    @info(name = 'query')
+                    from deviceDoorStream#window.timeBatch(20 sec) join deviceHealthStream#window.timeBatch(20 sec)
+                    on deviceDoorStream.smartDeviceId == deviceHealthStream.smartDeviceId
+                    select deviceHealthStream.smartDeviceId  as smartDeviceId,
+                    deviceDoorStream.gatewayId,
+                    sum(deviceDoorStream.doorOpenDuration) as totalDuration,
+                    avg(deviceHealthStream.temperature) as averageTemperature
+                    group by deviceHealthStream.smartDeviceId
+                    having totalDuration < $maxDuration and ( averageTemperature < $maxTemperature and averageTemperature > $minTemperature)
+                    insert into alertStream;
                  ]]>
             </executionPlan>
             <parameters>
-                <parameter name="maxVal" type="int">
-                    <displayName>Maximum Temperature</displayName>
-                    <description>Maximum room temperature threshold</description>
-                    <defaultValue>75</defaultValue>
+                <parameter name="$maxDuration" type="int">
+                    <displayName>Maximum duration</displayName>
+                    <description>Maximum duration of between time windows</description>
+                    <defaultValue>2</defaultValue>
+                </parameter>
+
+                <parameter name="$minTemperature" type="int">
+                    <displayName>Minimum temperature</displayName>
+                    <description>Minimum temperature average temperature should be</description>
+                    <defaultValue>2</defaultValue>
+                </parameter>
+
+                <parameter name="$maxTemperature" type="int">
+                    <displayName>Maximum temperature</displayName>
+                    <description>Maximum temperature average temperature should be</description>
+                    <defaultValue>8</defaultValue>
                 </parameter>
             </parameters>
         </template>
 
         <template name="Template2">
-            <description>To check maximum room temperature of specified room</description>
+            <description>Trigger alert by specifying minimum maximum temperature and total duration values</description>
             <executionPlan>
                 <![CDATA[
-                /* Enter a unique ExecutionPlan */
-                @Plan:name('testPlan')
+               /* Enter a unique ExecutionPlan */
+                    @Plan:name('TemperatureAnalysis')
 
-                /* Enter a unique description for ExecutionPlan */
-                -- @Plan:description('ExecutionPlan')
+                    /* Enter a unique description for ExecutionPlan */
+                    -- @Plan:description('ExecutionPlan')
 
-                /* define streams and write query here ... */
+                    /* define streams/tables and write queries here ... */
 
-                @Import('inStream:1.0.0')
-                define stream inStream (temperature double, roomNumber int);
 
-                @Export('outStream:1.0.0')
-                define stream outStream (temperature double, roomNumber int);
 
-                from inStream[temperature > $maxVal and roomNumber > $roomNo]
-                select temperature,roomNumber
-                insert into outStream;
+                    @Import('deviceHealthStream:1.0.0')
+                    define stream deviceHealthStream (smartDeviceHealthRecordId int, smartDeviceId int, gatewayId int, eventId int, eventTime string, eventTypeId int, lightIntensity int, temperature float, humidity float, soundLevel float, isDoorOpen bool, powerStatusId int, batteryLevel float, createdOn string);
+
+                    @Import('deviceDoorStream:1.0.0')
+                    define stream deviceDoorStream (smartDeviceDoorStatusId int, smartDeviceId int, gatewayId int, eventTime string, EventId int, doorOpen string, createdOn string, doorOpenDuration int);
+
+                    @Export('alertStream:1.0.0')
+                    define stream alertStream2 (smartDeviceId int, gatewayId int, totalDuration long, averageTemperature double);
+
+                    @info(name = 'query')
+                    from deviceDoorStream#window.timeBatch(20 sec) join deviceHealthStream#window.timeBatch(20 sec)
+                    on deviceDoorStream.smartDeviceId == deviceHealthStream.smartDeviceId
+                    select deviceHealthStream.smartDeviceId  as smartDeviceId,
+                    deviceDoorStream.gatewayId,
+                    sum(deviceDoorStream.doorOpenDuration) as totalDuration,
+                    avg(deviceHealthStream.temperature) as averageTemperature
+                    group by deviceHealthStream.smartDeviceId
+                    having (totalDuration < $maxDuration and totalDuration > $minDuration ) and ( averageTemperature < $maxTemperature and averageTemperature > $minTemperature)
+                    insert into alertStream;
                  ]]>
             </executionPlan>
             <parameters>
-                <parameter name="maxVal" type="int">
-                    <displayName>Maximum Temperature</displayName>
-                    <description>Maximum room temperature threshold</description>
-                    <defaultValue>75</defaultValue>
+                <parameter name="$maxDuration" type="int">
+                    <displayName>Maximum duration</displayName>
+                    <description>Maximum duration of between time windows</description>
+                    <defaultValue>10</defaultValue>
                 </parameter>
 
+                <parameter name="$minDuration" type="int">
+                    <displayName>Minimum duration</displayName>
+                    <description>Minimum duration of between time windows</description>
+                    <defaultValue>2</defaultValue>
+                </parameter>
 
-                <parameter name="roomNo" type="int">
-                    <displayName>Room Number</displayName>
-                    <description>Select one of available rooms</description>
-                    <defaultValue>1</defaultValue>
-                    <options>1, 2, 3, 4, 5</options>
+                <parameter name="$minTemperature" type="int">
+                    <displayName>Minimum temperature</displayName>
+                    <description>Minimum temperature average temperature should be</description>
+                    <defaultValue>2</defaultValue>
+                </parameter>
+
+                <parameter name="$maxTemperature" type="int">
+                    <displayName>Maximum temperature</displayName>
+                    <description>Maximum temperature average temperature should be</description>
+                    <defaultValue>12</defaultValue>
                 </parameter>
             </parameters>
         </template>
 
 
         <template name="Template3">
-            <description>To check average room temperature within specified time window of all rooms</description>
+            <description>Trigger alert by specifying only minimum value</description>
             <executionPlan>
                 <![CDATA[
-                /* Enter a unique ExecutionPlan */
-                @Plan:name('testPlan')
+               /* Enter a unique ExecutionPlan */
+                    @Plan:name('TemperatureAnalysis')
 
-                /* Enter a unique description for ExecutionPlan */
-                -- @Plan:description('ExecutionPlan')
+                    /* Enter a unique description for ExecutionPlan */
+                    -- @Plan:description('ExecutionPlan')
 
-                /* define streams and write query here ... */
+                    /* define streams/tables and write queries here ... */
 
-                @Import('inStream:1.0.0')
-                define stream inStream (temperature double, roomNumber int);
 
-                @Export('outStream:1.0.0')
-                define stream outStream (temperature double, roomNumber int);
 
-                from inStream#window.time($timeInterval)
-                select avg(temperature) as temperature,roomNumber
-                group by roomNumber
-				having temperature>= $maxVal
-				insert into outStream;
+                    @Import('deviceHealthStream:1.0.0')
+                    define stream deviceHealthStream (smartDeviceHealthRecordId int, smartDeviceId int, gatewayId int, eventId int, eventTime string, eventTypeId int, lightIntensity int, temperature float, humidity float, soundLevel float, isDoorOpen bool, powerStatusId int, batteryLevel float, createdOn string);
 
+                    @Import('deviceDoorStream:1.0.0')
+                    define stream deviceDoorStream (smartDeviceDoorStatusId int, smartDeviceId int, gatewayId int, eventTime string, EventId int, doorOpen string, createdOn string, doorOpenDuration int);
+
+                    @Export('alertStream:1.0.0')
+                    define stream alertStream2 (smartDeviceId int, gatewayId int, totalDuration long, averageTemperature double);
+
+                    @info(name = 'query')
+                    from deviceDoorStream#window.timeBatch(20 sec) join deviceHealthStream#window.timeBatch(20 sec)
+                    on deviceDoorStream.smartDeviceId == deviceHealthStream.smartDeviceId
+                    select deviceHealthStream.smartDeviceId  as smartDeviceId,
+                    deviceDoorStream.gatewayId,
+                    sum(deviceDoorStream.doorOpenDuration) as totalDuration,
+                    avg(deviceHealthStream.temperature) as averageTemperature
+                    group by deviceHealthStream.smartDeviceId
+                    having  $minTemperature > $minTemperature
+                    insert into alertStream;
                  ]]>
             </executionPlan>
             <parameters>
-                <parameter name="maxVal" type="int">
-                    <displayName>Maximum Temperature</displayName>
-                    <description>Maximum room temperature threshold</description>
-                    <defaultValue>75</defaultValue>
-                </parameter>
-                <parameter name="timeInterval" type="time">
-                    <displayName>Time Interval</displayName>
-                    <description>Time can be defined such 5 sec, 1 min and etc</description>
-                    <defaultValue>1 min</defaultValue>
+                <parameter name="$minTemperature" type="int">
+                    <displayName>Minimum temperature</displayName>
+                    <description>Minimum temperature average temperature should be</description>
+                    <defaultValue>15</defaultValue>
                 </parameter>
             </parameters>
         </template>
+
+        <template name="Template3">
+            <description>Trigger alert by specifying only minimum value</description>
+            <executionPlan>
+                <![CDATA[
+               /* Enter a unique ExecutionPlan */
+                    @Plan:name('TemperatureAnalysis')
+
+                    /* Enter a unique description for ExecutionPlan */
+                    -- @Plan:description('ExecutionPlan')
+
+                    /* define streams/tables and write queries here ... */
+
+                    @Import('deviceHealthStream:1.0.0')
+                    define stream deviceHealthStream (smartDeviceHealthRecordId int, smartDeviceId int, gatewayId int, eventId int, eventTime string, eventTypeId int, lightIntensity int, temperature float, humidity float, soundLevel float, isDoorOpen bool, powerStatusId int, batteryLevel float, createdOn string);
+
+                    @Import('deviceDoorStream:1.0.0')
+                    define stream deviceDoorStream (smartDeviceDoorStatusId int, smartDeviceId int, gatewayId int, eventTime string, EventId int, doorOpen string, createdOn string, doorOpenDuration int);
+
+                    @Export('alertStream:1.0.0')
+                    define stream alertStream (smartDeviceId int, gatewayId int, totalDuration long, averageTemperature double);
+
+                    @info(name = 'query')
+                    from deviceDoorStream#window.timeBatch($timeBatchWindow) join deviceHealthStream#window.timeBatch($timeBatchWindow)
+                    on deviceDoorStream.smartDeviceId == deviceHealthStream.smartDeviceId
+                    select deviceHealthStream.smartDeviceId  as smartDeviceId,
+                    deviceDoorStream.gatewayId,
+                    sum(deviceDoorStream.doorOpenDuration) as totalDuration,
+                    avg(deviceHealthStream.temperature) as averageTemperature
+                    group by deviceHealthStream.smartDeviceId
+                    having totalDuration < $maxDuration and
+                    (time:timestampInMilliseconds(time:currentTime(),'HH:mm:ss') >
+                                      time:timestampInMilliseconds('$startTime','HH:mm:ss')
+                                     and time:timestampInMilliseconds(time:currentTime(),'HH:mm:ss') <
+                                      time:timestampInMilliseconds('$endTime','HH:mm:ss'))
+                    insert into alertStream;
+                 ]]>
+            </executionPlan>
+            <parameters>
+                <parameter name="$timeBatchWindow" type="time">
+                    <displayName>Time batch window size</displayName>
+                    <description>Maximum door open duration (time value eg:-60 min)</description>
+                    <defaultValue>60 min</defaultValue>
+                </parameter>
+                <parameter name="$maxDuration" type="int">
+                    <displayName>Maximum duration</displayName>
+                    <description>Maximum door open duration (specify value in seconds)</description>
+                    <defaultValue>300</defaultValue>
+                </parameter>
+                <parameter name="$startTime" type="string">
+                    <displayName>Starting time</displayName>
+                    <description>Value should be in 'HH:mm:ss' format</description>
+                    <defaultValue>08:00:00</defaultValue>
+                </parameter>
+                <parameter name="$endTime" type="string">
+                    <displayName>Ending time</displayName>
+                    <description>Value should be in 'HH:mm:ss' format</description>
+                    <defaultValue>20:00:00</defaultValue>
+                </parameter>
+            </parameters>
+        </template>
+
 
     </templates>
     <streams>
         <stream>
             {
-            "streamId": "inStream:1.0.0",
-            "name": "inStream",
+            "streamId": "deviceHealthStream:1.0.0",
+            "name": "deviceHealthStream",
             "version": "1.0.0",
             "nickName": "",
             "description": "",
-            "metaData": [
+            "metaData": [],
+            "correlationData": [],
+            "payloadData": [
             {
-            "name": "temperature",
-            "type": "DOUBLE"
+            "name": "smartDeviceHealthRecordId",
+            "type": "INT"
             },
             {
-            "name": "roomNumber",
+            "name": "smartDeviceId",
             "type": "INT"
+            },
+            {
+            "name": "gatewayId",
+            "type": "INT"
+            },
+            {
+            "name": "eventId",
+            "type": "INT"
+            },
+            {
+            "name": "eventTime",
+            "type": "STRING"
+            },
+            {
+            "name": "eventTypeId",
+            "type": "INT"
+            },
+            {
+            "name": "lightIntensity",
+            "type": "INT"
+            },
+            {
+            "name": "temperature",
+            "type": "FLOAT"
+            },
+            {
+            "name": "humidity",
+            "type": "FLOAT"
+            },
+            {
+            "name": "soundLevel",
+            "type": "FLOAT"
+            },
+            {
+            "name": "isDoorOpen",
+            "type": "BOOL"
+            },
+            {
+            "name": "powerStatusId",
+            "type": "INT"
+            },
+            {
+            "name": "batteryLevel",
+            "type": "FLOAT"
+            },
+            {
+            "name": "createdOn",
+            "type": "STRING"
             }
-            ],
-            "correlationData": [],
-            "payloadData": []
+            ]
             }
         </stream>
         <stream>
             {
-            "streamId": "outStream:1.0.0",
-            "name": "outStream",
+            "streamId": "deviceDoorStream:1.0.0",
+            "name": "deviceDoorStream",
             "version": "1.0.0",
             "nickName": "",
             "description": "",
-            "metaData": [
+            "metaData": [],
+            "correlationData": [],
+            "payloadData": [
             {
-            "name": "temperature",
-            "type": "DOUBLE"
+            "name": "smartDeviceDoorStatusId",
+            "type": "INT"
             },
             {
-            "name": "roomNumber",
+            "name": "smartDeviceId",
+            "type": "INT"
+            },
+            {
+            "name": "gatewayId",
+            "type": "INT"
+            },
+            {
+            "name": "eventTime",
+            "type": "STRING"
+            },
+            {
+            "name": "EventId",
+            "type": "INT"
+            },
+            {
+            "name": "doorOpen",
+            "type": "STRING"
+            },
+            {
+            "name": "createdOn",
+            "type": "STRING"
+            },
+            {
+            "name": "doorOpenDuration",
             "type": "INT"
             }
-            ],
-            "correlationData": [],
-            "payloadData": []
+            ]
+            }
+        </stream>
+        <stream>
+            {
+            "name": "alertStream",
+            "version": "1.0.0",
+            "nickName": "",
+            "description": "",
+            "payloadData": [
+            {
+            "name": "smartDeviceId",
+            "type": "INT"
+            },
+            {
+            "name": "gatewayId",
+            "type": "INT"
+            },
+            {
+            "name": "totalDuration",
+            "type": "LONG"
+            },
+            {
+            "name": "averageTemperature",
+            "type": "DOUBLE"
+            }
+            ]
             }
         </stream>
     </streams>
