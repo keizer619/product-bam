@@ -225,7 +225,7 @@
                 <parameter name="windowSize" type="time">
                     <displayName>Time batch window size</displayName>
                     <description>Value type should be time</description>
-                    <defaultValue>*/10 * * * * ?</defaultValue>
+                    <defaultValue>0 */30 * * * ?</defaultValue>
                 </parameter>
             </parameters>
         </template>
@@ -257,7 +257,7 @@
                 <parameter name="windowSize" type="time">
                     <displayName>Time batch window size</displayName>
                     <description>Value type should be time</description>
-                    <defaultValue>*/10 * * * * ?</defaultValue>
+                    <defaultValue>0 */30 * * * ?</defaultValue>
                 </parameter>
             </parameters>
         </template>
