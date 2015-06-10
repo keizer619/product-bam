@@ -18,7 +18,7 @@
 <templateDomain name="TemperatureAnalysis">
     <description>Temperature Analysis Description</description>
     <templates>
-        <template name="TemperatureAnalysis1">
+        <template name="TemperatureAnalysis">
             <description>Trigger alert by specifying minimum maximum temperature values and maximum total duration
                 value
             </description>
@@ -32,171 +32,109 @@
 
                     /* define streams/tables and write queries here ... */
 
+                    @Import('deviceHealthMainStream:1.0.0')
+                    define stream deviceHealthMainStream (smartDeviceHealthRecordId int, smartDeviceId int, gatewayId int, eventId int, eventTime string, eventTypeId int, lightIntensity int, temperature double, humidity float, soundLevel float, isDoorOpen bool, powerStatusId int, batteryLevel int, createdOn string);
 
-
-                    @Import('deviceHealthStream:1.0.0')
-                    define stream deviceHealthStream (smartDeviceHealthRecordId int, smartDeviceId int, gatewayId int, eventId int, eventTime string, eventTypeId int, lightIntensity int, temperature float, humidity float, soundLevel float, isDoorOpen bool, powerStatusId int, batteryLevel int, createdOn string);
-
-                    @Import('deviceDoorStream:1.0.0')
-                    define stream deviceDoorStream (smartDeviceDoorStatusId int, smartDeviceId int, gatewayId int, eventTime string, EventId int, doorOpen string, createdOn string, doorOpenDuration int);
+                    @Import('deviceDoorMainStream:1.0.0')
+                    define stream deviceDoorMainStream (smartDeviceDoorStatusId int, smartDeviceId int, gatewayId int, eventTime string, EventId int, doorOpen string, createdOn string, doorOpenDuration long);
 
                     @Export('alertStream:1.0.0')
                     define stream alertStream (smartDeviceId int, gatewayId int, totalDuration long, averageTemperature double);
 
                     @info(name = 'query')
-                    from deviceDoorStream#window.timeBatch($windowSize) join deviceHealthStream#window.timeBatch($windowSize)
-                    on deviceDoorStream.smartDeviceId == deviceHealthStream.smartDeviceId
-                    select deviceHealthStream.smartDeviceId  as smartDeviceId,
-                    deviceDoorStream.gatewayId,
-                    sum(deviceDoorStream.doorOpenDuration) as totalDuration,
-                    avg(deviceHealthStream.temperature) as averageTemperature
-                    group by deviceHealthStream.smartDeviceId
-                    having totalDuration < $maxDuration and ( averageTemperature > $maxTemperature or averageTemperature < $minTemperature)
+                    from deviceDoorMainStream#window.time($windowSize) join deviceHealthMainStream#window.time($windowSize)
+                    on deviceDoorMainStream.smartDeviceId == deviceHealthMainStream.smartDeviceId
+                    select deviceHealthMainStream.smartDeviceId  as smartDeviceId,
+                    deviceDoorMainStream.gatewayId,
+                    deviceDoorMainStream.doorOpenDuration as totalDuration,
+                    deviceHealthMainStream.temperature as averageTemperature
+                    having (totalDuration < $maxDurationCase1 and ( averageTemperature > $maxTemperatureCase1 or averageTemperature < $minTemperatureCase1))
+					or ((totalDuration > $minDurationCase2 and totalDuration > $maxDurationCase2) and ( averageTemperature > $maxTemperatureCase2 or averageTemperature < $minTemperatureCase2))
+					or ((totalDuration > $minDurationCase3 and totalDuration > $maxDurationCase3) and ( averageTemperature > $maxTemperatureCase3 or averageTemperature < $minTemperatureCase3))
+					or totalDuration > $minDurationCase4
                     insert into alertStream;
+
                  ]]>
             </executionPlan>
             <parameters>
                 <parameter name="windowSize" type="time">
                     <displayName>Time batch window size</displayName>
-                    <description>Value type should be time eg:-60 min</description>
-                    <defaultValue>30 min</defaultValue>
+                    <description>Value type should be time eg:-1 min</description>
+                    <defaultValue>1 min</defaultValue>
                 </parameter>
 
-                <parameter name="maxDuration" type="int">
-                    <displayName>Maximum duration</displayName>
+                <parameter name="maxDurationCase1" type="int">
+                    <displayName>Maximum duration (case 1)</displayName>
                     <description>Maximum duration of between time windows in seconds</description>
                     <defaultValue>120</defaultValue>
                 </parameter>
 
-                <parameter name="minTemperature" type="int">
-                    <displayName>Minimum temperature</displayName>
+                <parameter name="minTemperatureCase1" type="int">
+                    <displayName>Minimum temperature (case 1)</displayName>
                     <description>Minimum temperature average temperature should be</description>
                     <defaultValue>2</defaultValue>
                 </parameter>
 
-                <parameter name="maxTemperature" type="int">
-                    <displayName>Maximum temperature</displayName>
+                <parameter name="maxTemperatureCase1" type="int">
+                    <displayName>Maximum temperature (case 1)</displayName>
                     <description>Maximum temperature average temperature should be</description>
                     <defaultValue>8</defaultValue>
                 </parameter>
-            </parameters>
-        </template>
 
-        <template name="TemperatureAnalysis2">
-            <description>Trigger alert by specifying minimum maximum temperature and total duration values</description>
-            <executionPlan>
-                <![CDATA[
-               /* Enter a unique ExecutionPlan */
-                    @Plan:name('TemperatureAnalysis')
-
-                    /* Enter a unique description for ExecutionPlan */
-                    -- @Plan:description('ExecutionPlan')
-
-                    /* define streams/tables and write queries here ... */
-
-
-
-                    @Import('deviceHealthStream:1.0.0')
-                    define stream deviceHealthStream (smartDeviceHealthRecordId int, smartDeviceId int, gatewayId int, eventId int, eventTime string, eventTypeId int, lightIntensity int, temperature float, humidity float, soundLevel float, isDoorOpen bool, powerStatusId int, batteryLevel int, createdOn string);
-
-                    @Import('deviceDoorStream:1.0.0')
-                    define stream deviceDoorStream (smartDeviceDoorStatusId int, smartDeviceId int, gatewayId int, eventTime string, EventId int, doorOpen string, createdOn string, doorOpenDuration int);
-
-                    @Export('alertStream:1.0.0')
-                    define stream alertStream (smartDeviceId int, gatewayId int, totalDuration long, averageTemperature double);
-
-                    @info(name = 'query')
-                    from deviceDoorStream#window.timeBatch($windowSize) join deviceHealthStream#window.timeBatch($windowSize)
-                    on deviceDoorStream.smartDeviceId == deviceHealthStream.smartDeviceId
-                    select deviceHealthStream.smartDeviceId  as smartDeviceId,
-                    deviceDoorStream.gatewayId,
-                    sum(deviceDoorStream.doorOpenDuration) as totalDuration,
-                    avg(deviceHealthStream.temperature) as averageTemperature
-                    group by deviceHealthStream.smartDeviceId
-                    having (totalDuration < $maxDuration and totalDuration > $minDuration ) and ( averageTemperature > $maxTemperature and averageTemperature < $minTemperature)
-                    insert into alertStream;
-                 ]]>
-            </executionPlan>
-            <parameters>
-                <parameter name="windowSize" type="time">
-                    <displayName>Time batch window size</displayName>
-                    <description>Value type should be time eg:-60 min</description>
-                    <defaultValue>30 min</defaultValue>
-                </parameter>
-
-                <parameter name="maxDuration" type="int">
-                    <displayName>Maximum duration</displayName>
+                <parameter name="maxDurationCase2" type="int">
+                    <displayName>Maximum duration (case 2)</displayName>
                     <description>Maximum duration of between time windows in seconds</description>
                     <defaultValue>600</defaultValue>
                 </parameter>
 
-                <parameter name="minDuration" type="int">
-                    <displayName>Minimum duration</displayName>
+                <parameter name="minDurationCase2" type="int">
+                    <displayName>Minimum duration (case 2)</displayName>
                     <description>Minimum duration of between time windows in seconds</description>
                     <defaultValue>120</defaultValue>
                 </parameter>
 
-                <parameter name="minTemperature" type="int">
-                    <displayName>Minimum temperature</displayName>
+                <parameter name="minTemperatureCase2" type="int">
+                    <displayName>Minimum temperature (case 2)</displayName>
                     <description>Minimum temperature average temperature should be</description>
                     <defaultValue>2</defaultValue>
                 </parameter>
 
-                <parameter name="maxTemperature" type="int">
-                    <displayName>Maximum temperature</displayName>
+                <parameter name="maxTemperatureCase2" type="int">
+                    <displayName>Maximum temperature (case 2)</displayName>
                     <description>Maximum temperature average temperature should be</description>
                     <defaultValue>12</defaultValue>
                 </parameter>
-            </parameters>
-        </template>
 
-
-        <template name="TemperatureAnalysis3">
-            <description>Trigger alert by specifying only maximum value</description>
-            <executionPlan>
-                <![CDATA[
-               /* Enter a unique ExecutionPlan */
-                    @Plan:name('TemperatureAnalysis')
-
-                    /* Enter a unique description for ExecutionPlan */
-                    -- @Plan:description('ExecutionPlan')
-
-                    /* define streams/tables and write queries here ... */
-
-
-
-                    @Import('deviceHealthStream:1.0.0')
-                    define stream deviceHealthStream (smartDeviceHealthRecordId int, smartDeviceId int, gatewayId int, eventId int, eventTime string, eventTypeId int, lightIntensity int, temperature float, humidity float, soundLevel float, isDoorOpen bool, powerStatusId int, batteryLevel int, createdOn string);
-
-                    @Import('deviceDoorStream:1.0.0')
-                    define stream deviceDoorStream (smartDeviceDoorStatusId int, smartDeviceId int, gatewayId int, eventTime string, EventId int, doorOpen string, createdOn string, doorOpenDuration int);
-
-                    @Export('alertStream:1.0.0')
-                    define stream alertStream (smartDeviceId int, gatewayId int, totalDuration long, averageTemperature double);
-
-                    @info(name = 'query')
-                    from deviceDoorStream#window.timeBatch($windowSize) join deviceHealthStream#window.timeBatch($windowSize)
-                    on deviceDoorStream.smartDeviceId == deviceHealthStream.smartDeviceId
-                    select deviceHealthStream.smartDeviceId  as smartDeviceId,
-                    deviceDoorStream.gatewayId,
-                    sum(deviceDoorStream.doorOpenDuration) as totalDuration,
-                    avg(deviceHealthStream.temperature) as averageTemperature
-                    group by deviceHealthStream.smartDeviceId
-                    having  $maxTemperature < totalDuration
-                    insert into alertStream;
-                 ]]>
-            </executionPlan>
-            <parameters>
-                <parameter name="windowSize" type="time">
-                    <displayName>Time batch window size</displayName>
-                    <description>Value type should be time eg:-60 min</description>
-                    <defaultValue>60 min</defaultValue>
-                </parameter>
-                <parameter name="maxTemperature" type="int">
-                    <displayName>Maximum temperature</displayName>
-                    <description>Maximum temperature average temperature should be in seconds</description>
+                <parameter name="maxDurationCase3" type="int">
+                    <displayName>Maximum duration (case 3)</displayName>
+                    <description>Maximum duration of between time windows in seconds</description>
                     <defaultValue>900</defaultValue>
                 </parameter>
+
+                <parameter name="minDurationCase3" type="int">
+                    <displayName>Minimum duration (case 3)</displayName>
+                    <description>Minimum duration of between time windows in seconds</description>
+                    <defaultValue>600</defaultValue>
+                </parameter>
+
+                <parameter name="minTemperatureCase3" type="int">
+                    <displayName>Minimum temperature (case 3)</displayName>
+                    <description>Minimum temperature average temperature should be</description>
+                    <defaultValue>2</defaultValue>
+                </parameter>
+
+                <parameter name="maxTemperatureCase3" type="int">
+                    <displayName>Maximum temperature (case 3)</displayName>
+                    <description>Maximum temperature average temperature should be</description>
+                    <defaultValue>14</defaultValue>
+                </parameter>
+
+                <parameter name="minDurationCase4" type="int">
+                    <displayName>Minimum duration (case 4)</displayName>
+                    <description>Minimum duration of between time windows in seconds</description>
+                    <defaultValue>900</defaultValue>
+                </parameter>
+
             </parameters>
         </template>
 
@@ -212,23 +150,23 @@
 
                     /* define streams/tables and write queries here ... */
 
-                    @Import('deviceHealthStream:1.0.0')
-                    define stream deviceHealthStream (smartDeviceHealthRecordId int, smartDeviceId int, gatewayId int, eventId int, eventTime string, eventTypeId int, lightIntensity int, temperature float, humidity float, soundLevel float, isDoorOpen bool, powerStatusId int, batteryLevel int, createdOn string);
+                    @Import('deviceHealthMainStream:1.0.0')
+                    define stream deviceHealthMainStream (smartDeviceHealthRecordId int, smartDeviceId int, gatewayId int, eventId int, eventTime string, eventTypeId int, lightIntensity int, temperature double, humidity float, soundLevel float, isDoorOpen bool, powerStatusId int, batteryLevel int, createdOn string);
 
-                    @Import('deviceDoorStream:1.0.0')
-                    define stream deviceDoorStream (smartDeviceDoorStatusId int, smartDeviceId int, gatewayId int, eventTime string, EventId int, doorOpen string, createdOn string, doorOpenDuration int);
+                    @Import('deviceDoorMainStream:1.0.0')
+                    define stream deviceDoorMainStream (smartDeviceDoorStatusId int, smartDeviceId int, gatewayId int, eventTime string, EventId int, doorOpen string, createdOn string, doorOpenDuration long);
 
                     @Export('alertStream:1.0.0')
                     define stream alertStream (smartDeviceId int, gatewayId int, totalDuration long, averageTemperature double);
 
                     @info(name = 'query')
-                    from deviceDoorStream#window.timeBatch($windowSize) join deviceHealthStream#window.timeBatch($windowSize)
-                    on deviceDoorStream.smartDeviceId == deviceHealthStream.smartDeviceId
-                    select deviceHealthStream.smartDeviceId  as smartDeviceId,
-                    deviceDoorStream.gatewayId,
-                    sum(deviceDoorStream.doorOpenDuration) as totalDuration,
-                    avg(deviceHealthStream.temperature) as averageTemperature
-                    group by deviceHealthStream.smartDeviceId
+                    from deviceDoorMainStream#window.time($windowSize) join deviceHealthMainStream#window.time($windowSize)
+                    on deviceDoorMainStream.smartDeviceId == deviceHealthMainStream.smartDeviceId
+                    select deviceHealthMainStream.smartDeviceId  as smartDeviceId,
+                    deviceDoorMainStream.gatewayId,
+                    sum(deviceDoorMainStream.doorOpenDuration) as totalDuration,
+                    avg(deviceHealthMainStream.temperature) as averageTemperature
+                    group by deviceHealthMainStream.smartDeviceId
                     having totalDuration > $maxDuration and
                     (time:timestampInMilliseconds(time:currentTime(),'HH:mm:ss') >
                                       time:timestampInMilliseconds('$startTime','HH:mm:ss')
@@ -241,7 +179,7 @@
                 <parameter name="windowSize" type="time">
                     <displayName>Time batch window size</displayName>
                     <description>Value type should be time eg:-60 min</description>
-                    <defaultValue>60 min</defaultValue>
+                    <defaultValue>32 min</defaultValue>
                 </parameter>
                 <parameter name="maxDuration" type="int">
                     <displayName>Maximum duration</displayName>
@@ -261,7 +199,68 @@
             </parameters>
         </template>
 
+        <template name="DoorAggregate">
+            <description>Trigger alert by specifying only minimum value</description>
+            <executionPlan>
+                <![CDATA[
+                    /* Enter a unique description for ExecutionPlan */
+                    -- @Plan:description('ExecutionPlan')
 
+                    /* define streams/tables and write queries here ... */
+                    @Import('deviceDoorStream:1.0.0')
+                    define stream deviceDoorStream (smartDeviceDoorStatusId int, smartDeviceId int, gatewayId int, eventTime string, EventId int, doorOpen string, createdOn string, doorOpenDuration int);
+
+					@Export('deviceDoorMainStream:1.0.0')
+					define stream deviceDoorMainStream (smartDeviceDoorStatusId int, smartDeviceId int, gatewayId int, eventTime string, EventId int, doorOpen string, createdOn string, doorOpenDuration long);
+
+                    @info(name = 'query')
+                    from deviceDoorStream#window.cron('$windowSize')
+					select deviceDoorStream.smartDeviceDoorStatusId, deviceDoorStream.smartDeviceId, deviceDoorStream.gatewayId, deviceDoorStream.eventTime,
+					deviceDoorStream.EventId, deviceDoorStream.doorOpen, deviceDoorStream.createdOn, sum(deviceDoorStream.doorOpenDuration) as doorOpenDuration
+                    group by deviceDoorStream.smartDeviceId
+                    insert into deviceDoorMainStream;
+                 ]]>
+            </executionPlan>
+            <parameters>
+                <parameter name="windowSize" type="time">
+                    <displayName>Time batch window size</displayName>
+                    <description>Value type should be time</description>
+                    <defaultValue>*/10 * * * * ?</defaultValue>
+                </parameter>
+            </parameters>
+        </template>
+
+
+        <template name="HealthAggregate">
+            <description>Trigger alert by specifying only minimum value</description>
+            <executionPlan>
+                <![CDATA[
+               /* Enter a unique ExecutionPlan */
+                @Plan:name('HealthAggregate')
+
+                @Import('deviceHealthStream:1.0.0')
+                define stream deviceHealthStream (smartDeviceHealthRecordId int, smartDeviceId int, gatewayId int, eventId int, eventTime string, eventTypeId int, lightIntensity int, temperature float, humidity float, soundLevel float, isDoorOpen bool, powerStatusId int, batteryLevel int, createdOn string);
+
+                @Export('deviceHealthMainStream:1.0.0')
+                define stream deviceHealthMainStream (smartDeviceHealthRecordId int, smartDeviceId int, gatewayId int, eventId int, eventTime string, eventTypeId int, lightIntensity int, temperature double, humidity float, soundLevel float, isDoorOpen bool, powerStatusId int, batteryLevel int, createdOn string);
+
+                @info(name = 'query')
+                from deviceHealthStream#window.cron('$windowSize')
+                select deviceHealthStream.smartDeviceHealthRecordId, deviceHealthStream.smartDeviceId, deviceHealthStream.gatewayId, deviceHealthStream.eventId, deviceHealthStream.eventTime,
+                deviceHealthStream.eventTypeId, deviceHealthStream.lightIntensity, avg(deviceHealthStream.temperature) as temperature,
+                deviceHealthStream.humidity, deviceHealthStream.soundLevel, deviceHealthStream.isDoorOpen, deviceHealthStream.powerStatusId, deviceHealthStream.batteryLevel, deviceHealthStream.createdOn
+                group by deviceHealthStream.smartDeviceId
+                insert into deviceHealthMainStream;
+                 ]]>
+            </executionPlan>
+            <parameters>
+                <parameter name="windowSize" type="time">
+                    <displayName>Time batch window size</displayName>
+                    <description>Value type should be time</description>
+                    <defaultValue>*/10 * * * * ?</defaultValue>
+                </parameter>
+            </parameters>
+        </template>
     </templates>
     <streams>
         <stream>
@@ -374,6 +373,114 @@
             {
             "name": "doorOpenDuration",
             "type": "INT"
+            }
+            ]
+            }
+        </stream>
+        <stream>
+            {
+            "name": "deviceDoorMainStream",
+            "version": "1.0.0",
+            "nickName": "",
+            "description": "",
+            "payloadData": [
+            {
+            "name": "smartDeviceDoorStatusId",
+            "type": "INT"
+            },
+            {
+            "name": "smartDeviceId",
+            "type": "INT"
+            },
+            {
+            "name": "gatewayId",
+            "type": "INT"
+            },
+            {
+            "name": "eventTime",
+            "type": "STRING"
+            },
+            {
+            "name": "EventId",
+            "type": "INT"
+            },
+            {
+            "name": "doorOpen",
+            "type": "STRING"
+            },
+            {
+            "name": "createdOn",
+            "type": "STRING"
+            },
+            {
+            "name": "doorOpenDuration",
+            "type": "LONG"
+            }
+            ]
+            }
+        </stream>
+        <stream>
+            {
+            "name": "deviceHealthMainStream",
+            "version": "1.0.0",
+            "nickName": "",
+            "description": "",
+            "payloadData": [
+            {
+            "name": "smartDeviceHealthRecordId",
+            "type": "INT"
+            },
+            {
+            "name": "smartDeviceId",
+            "type": "INT"
+            },
+            {
+            "name": "gatewayId",
+            "type": "INT"
+            },
+            {
+            "name": "eventId",
+            "type": "INT"
+            },
+            {
+            "name": "eventTime",
+            "type": "STRING"
+            },
+            {
+            "name": "eventTypeId",
+            "type": "INT"
+            },
+            {
+            "name": "lightIntensity",
+            "type": "INT"
+            },
+            {
+            "name": "temperature",
+            "type": "DOUBLE"
+            },
+            {
+            "name": "humidity",
+            "type": "FLOAT"
+            },
+            {
+            "name": "soundLevel",
+            "type": "FLOAT"
+            },
+            {
+            "name": "isDoorOpen",
+            "type": "BOOL"
+            },
+            {
+            "name": "powerStatusId",
+            "type": "INT"
+            },
+            {
+            "name": "batteryLevel",
+            "type": "INT"
+            },
+            {
+            "name": "createdOn",
+            "type": "STRING"
             }
             ]
             }
