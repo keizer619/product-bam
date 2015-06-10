@@ -38,10 +38,13 @@
                     @Import('deviceDoorMainStream:1.0.0')
                     define stream deviceDoorMainStream (smartDeviceDoorStatusId int, smartDeviceId int, gatewayId int, eventTime string, EventId int, doorOpen string, createdOn string, doorOpenDuration long);
 
-                    @Export('alertStream:1.0.0')
-                    define stream alertStream (smartDeviceId int, gatewayId int, totalDuration long, averageTemperature double);
+                    @from(eventtable = 'rdbms' , datasource.name = 'assetStore' , table.name = 'device')
+					define table device (smartDeviceId int, assetId int, location string);
 
-                    @info(name = 'query')
+                    @Export('alertStream:1.0.0')
+                    define stream alertStream (smartDeviceId int, assetID int, totalDuration long, averageTemperature double, location string);
+
+                    @info(name = 'query1')
                     from deviceDoorMainStream#window.time($windowSize) join deviceHealthMainStream#window.time($windowSize)
                     on deviceDoorMainStream.smartDeviceId == deviceHealthMainStream.smartDeviceId
                     select deviceHealthMainStream.smartDeviceId  as smartDeviceId,
@@ -52,7 +55,16 @@
 					or ((totalDuration > $minDurationCase2 and totalDuration > $maxDurationCase2) and ( averageTemperature > $maxTemperatureCase2 or averageTemperature < $minTemperatureCase2))
 					or ((totalDuration > $minDurationCase3 and totalDuration > $maxDurationCase3) and ( averageTemperature > $maxTemperatureCase3 or averageTemperature < $minTemperatureCase3))
 					or totalDuration > $minDurationCase4
-                    insert into alertStream;
+                    insert into eventStream;
+
+					@info(name = 'query2')
+					from device join eventStream on device.smartDeviceId == eventStream.smartDeviceId
+					select eventStream.smartDeviceId,
+                    device.assetId as assetID,
+                    eventStream.totalDuration as totalDuration,
+                    eventStream.averageTemperature as averageTemperature,
+					device.location
+					insert into alertStream;
 
                  ]]>
             </executionPlan>
@@ -156,8 +168,11 @@
                     @Import('deviceDoorMainStream:1.0.0')
                     define stream deviceDoorMainStream (smartDeviceDoorStatusId int, smartDeviceId int, gatewayId int, eventTime string, EventId int, doorOpen string, createdOn string, doorOpenDuration long);
 
+                    @from(eventtable = 'rdbms' , datasource.name = 'assetStore' , table.name = 'device')
+					define table device (smartDeviceId int, assetId int, location string);
+
                     @Export('alertStream:1.0.0')
-                    define stream alertStream (smartDeviceId int, gatewayId int, totalDuration long, averageTemperature double);
+                    define stream alertStream (smartDeviceId int, assetID int, totalDuration long, averageTemperature double, location string);
 
                     @info(name = 'query')
                     from deviceDoorMainStream#window.time($windowSize) join deviceHealthMainStream#window.time($windowSize)
@@ -172,7 +187,16 @@
                                       time:timestampInMilliseconds('$startTime','HH:mm:ss')
                                      and time:timestampInMilliseconds(time:currentTime(),'HH:mm:ss') <
                                       time:timestampInMilliseconds('$endTime','HH:mm:ss'))
-                    insert into alertStream;
+                    insert into eventStream;
+
+					@info(name = 'query2')
+					from device join eventStream on device.smartDeviceId == eventStream.smartDeviceId
+					select eventStream.smartDeviceId,
+                    device.assetId as assetID,
+                    eventStream.totalDuration as totalDuration,
+                    eventStream.averageTemperature as averageTemperature,
+					device.location
+					insert into alertStream;
                  ]]>
             </executionPlan>
             <parameters>
@@ -497,7 +521,7 @@
             "type": "INT"
             },
             {
-            "name": "gatewayId",
+            "name": "assetID",
             "type": "INT"
             },
             {
@@ -507,6 +531,10 @@
             {
             "name": "averageTemperature",
             "type": "DOUBLE"
+            },
+            {
+            "name": "location",
+            "type": "STRING"
             }
             ]
             }
