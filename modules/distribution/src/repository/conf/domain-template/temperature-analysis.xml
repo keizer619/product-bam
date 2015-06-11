@@ -184,9 +184,9 @@
                     group by deviceHealthMainStream.smartDeviceId
                     having totalDuration > $maxDuration and
                     (time:timestampInMilliseconds(time:currentTime(),'HH:mm:ss') >
-                                      time:timestampInMilliseconds('$startTime','HH:mm:ss')
+                                      time:timestampInMilliseconds('$startTime','HH-mm-ss')
                                      and time:timestampInMilliseconds(time:currentTime(),'HH:mm:ss') <
-                                      time:timestampInMilliseconds('$endTime','HH:mm:ss'))
+                                      time:timestampInMilliseconds('$endTime','HH-mm-ss'))
                     insert into eventStream;
 
 					@info(name = 'query2')
@@ -213,12 +213,12 @@
                 <parameter name="startTime" type="string">
                     <displayName>Starting time</displayName>
                     <description>Value should be in 'HH:mm:ss' format</description>
-                    <defaultValue>08:00:00</defaultValue>
+                    <defaultValue>08-00-00</defaultValue>
                 </parameter>
                 <parameter name="endTime" type="string">
                     <displayName>Ending time</displayName>
                     <description>Value should be in 'HH:mm:ss' format</description>
-                    <defaultValue>20:00:00</defaultValue>
+                    <defaultValue>20-00-00</defaultValue>
                 </parameter>
             </parameters>
         </template>
